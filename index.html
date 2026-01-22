@@ -5,17 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIカメラアプリ</title>
     <style>
-        body { text-align: center; font-family: sans-serif; background: #f0f0f0; margin: 0; padding: 20px; }
-        #webcam-container { margin-top: 20px; }
-        canvas { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-        #label-container { margin-top: 20px; font-size: 1.2em; font-weight: bold; }
-        button { padding: 15px 30px; font-size: 1.2em; background: #007bff; color: white; border: none; border-radius: 50px; cursor: pointer; }
+        /* 全体のデザイン */
+        body { 
+            text-align: center; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: #f0f2f5; 
+            margin: 0; 
+            padding: 20px; 
+            color: #333;
+        }
+
+        h2 { margin-bottom: 20px; font-size: 1.5rem; }
+
+        /* カメラ周り */
+        #webcam-container { 
+            margin: 20px auto; 
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            border-radius: 15px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); 
+            line-height: 0; /* キャンバス下の隙間を消す */
+        }
+        canvas { width: 100%; height: auto; }
+
+        /* スタートボタン */
+        button { 
+            padding: 12px 30px; 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 50px; 
+            cursor: pointer; 
+            box-shadow: 0 4px 6px rgba(0,123,255,0.3);
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); }
+
+        /* 結果表示エリア（バーのデザイン） */
+        #label-container { 
+            max-width: 400px; 
+            margin: 20px auto; 
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: left;
+        }
+
+        .label-item { margin-bottom: 12px; }
+        .label-text { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem;}
+        
+        /* バーの背景（灰色） */
+        .progress-bar-bg { 
+            width: 100%; 
+            height: 12px; 
+            background-color: #e9ecef; 
+            border-radius: 10px; 
+            overflow: hidden; 
+        }
+        
+        /* バーの中身（青色） */
+        .progress-bar-fill { 
+            height: 100%; 
+            background-color: #007bff; 
+            width: 0%; 
+            transition: width 0.2s ease-out; /* なめらかに動く設定 */
+        }
     </style>
 </head>
 <body>
 
-    <h2>画像認識アプリ</h2>
-    <button type="button" onclick="init()">カメラを起動</button>
+    <h2>画像認識 AI</h2>
+    <button type="button" onclick="init()" id="start-btn">カメラを起動</button>
+    
     <div id="webcam-container"></div>
     <div id="label-container"></div>
 
@@ -23,31 +89,46 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script type="text/javascript">
-        // ★ここにあなたのモデルのURLを貼り付けてください！
+        // ★★★ここにあなたのモデルURLを貼ってください★★★
         const URL = "https://teachablemachine.withgoogle.com/models/gbsHjkdmRr/";
 
         let model, webcam, labelContainer, maxPredictions;
 
         async function init() {
+            // ボタンを消してロード中にする
+            const btn = document.getElementById("start-btn");
+            btn.style.display = "none";
+
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
 
-            // モデルのロード
             model = await tmImage.load(modelURL, metadataURL);
             maxPredictions = model.getTotalClasses();
 
-            // カメラのセットアップ（スマホのインカメラ/アウトカメラ対応）
-            const flip = true; // 前面カメラならtrue
+            const flip = true; 
             webcam = new tmImage.Webcam(300, 300, flip); 
-            await webcam.setup({ facingMode: "environment" }); // "user"ならインカメラ、"environment"ならアウトカメラ
+            await webcam.setup({ facingMode: "environment" });
             await webcam.play();
             window.requestAnimationFrame(loop);
 
-            // 画面にカメラを追加
             document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            // 結果表示エリアの準備
             labelContainer = document.getElementById("label-container");
-            for (let i = 0; i < maxPredictions; i++) { 
-                labelContainer.appendChild(document.createElement("div"));
+            for (let i = 0; i < maxPredictions; i++) {
+                // HTML要素を作成して追加
+                const div = document.createElement("div");
+                div.className = "label-item";
+                div.innerHTML = `
+                    <div class="label-text">
+                        <span id="label-name-${i}">読み込み中...</span>
+                        <span id="label-val-${i}">0%</span>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="bar-${i}"></div>
+                    </div>
+                `;
+                labelContainer.appendChild(div);
             }
         }
 
@@ -60,10 +141,24 @@
         async function predict() {
             const prediction = await model.predict(webcam.canvas);
             for (let i = 0; i < maxPredictions; i++) {
-                // 確率を表示
-                const classPrediction =
-                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-                labelContainer.childNodes[i].innerHTML = classPrediction;
+                const name = prediction[i].className;
+                const probability = prediction[i].probability.toFixed(2); // 0.00 〜 1.00
+                const percent = Math.round(probability * 100); // 0 〜 100
+
+                // テキストの更新
+                document.getElementById(`label-name-${i}`).innerText = name;
+                document.getElementById(`label-val-${i}`).innerText = percent + "%";
+
+                // バーの長さを更新（CSSのwidthを変更）
+                document.getElementById(`bar-${i}`).style.width = percent + "%";
+                
+                // 確率が高いときは色を変える（80%以上で赤くなる演出）
+                const bar = document.getElementById(`bar-${i}`);
+                if (percent > 80) {
+                    bar.style.backgroundColor = "#dc3545"; // 赤
+                } else {
+                    bar.style.backgroundColor = "#007bff"; // 青
+                }
             }
         }
     </script>
