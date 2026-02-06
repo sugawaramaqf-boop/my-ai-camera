@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>モータ・アクチュエータ完全攻略クイズ</title>
+    <style>
+        :root { --primary: #00d2ff; --accent: #ff007a; --bg: #0b0e14; --card: #151a24; --text: #e0e6ed; }
+        body { font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; min-height: 100vh; overflow-x: hidden; }
+        
+        #quiz-container { background: var(--card); width: 95%; max-width: 650px; padding: 25px; border-radius: 24px; box-shadow: 0 0 40px rgba(0,210,255,0.2); margin: 20px; align-self: center; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+        
+        .status-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.9rem; }
+        #combo-display { color: var(--accent); font-weight: bold; font-size: 1.4rem; transition: 0.2s; text-shadow: 0 0 10px var(--accent); }
+        
+        .progress-bar { width: 100%; height: 6px; background: #2d3436; border-radius: 3px; margin-bottom: 25px; overflow: hidden; }
+        #progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); width: 0%; transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        .question { font-size: 1.25rem; line-height: 1.6; margin-bottom: 25px; font-weight: 600; min-height: 4em; }
+        .choices { display: grid; gap: 12px; }
+        
+        button.choice { 
+            padding: 16px 20px; border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; 
+            background: rgba(255,255,255,0.05); color: var(--text); cursor: pointer; 
+            text-align: left; font-size: 1rem; transition: 0.2s;
+        }
+        button.choice:hover:not(:disabled) { background: rgba(0,210,255,0.15); border-color: var(--primary); transform: translateX(8px); }
+        button.choice:active { transform: scale(0.98); }
+        button.choice:disabled { cursor: default; }
+
+        #feedback { display: none; margin-top: 20px; padding: 18px; border-radius: 12px; animation: popIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); border-left: 6px solid; }
+        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .correct-ui { background: rgba(0,255,136,0.1); border-color: #00ff88; color: #00ff88; }
+        .incorrect-ui { background: rgba(255,71,87,0.1); border-color: #ff4757; color: #ff4757; }
+
+        #next-btn { 
+            display: none; width: 100%; margin-top: 20px; padding: 18px; 
+            background: linear-gradient(45deg, #00d2ff, #3a7bd5); color: white; 
+            border: none; border-radius: 50px; cursor: pointer; font-size: 1.1rem; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,210,255,0.3);
+        }
+
+        #result-screen { display: none; text-align: center; animation: fadeIn 0.8s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .rank-medal { font-size: 5rem; margin-bottom: 10px; }
+        .score-val { font-size: 4rem; font-weight: 900; background: linear-gradient(to bottom, #fff, var(--primary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <div id="quiz-screen">
+        <div class="status-header">
+            <span id="q-count">01 / 30</span>
+            <div id="combo-display"></div>
+            <span id="timer">15:00</span>
+        </div>
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        
+        <div class="question" id="question-text">Loading...</div>
+        <div class="choices" id="choices"></div>
+
+        <div id="feedback"></div>
+        <button id="next-btn" onclick="handleNext()">NEXT MISSION &gt;&gt;</button>
+    </div>
+
+    <div id="result-screen">
+        <div id="medal" class="rank-medal">⚙️</div>
+        <h2>MISSION COMPLETED</h2>
+        <div class="score-val" id="score-display">0 / 30</div>
+        <p id="rank-name" style="font-size: 1.6rem; color: var(--accent); font-weight: bold; margin: 10px 0;"></p>
+        <p id="rank-comment" style="margin-bottom: 30px; line-height: 1.8; color: #a0a0a0;"></p>
+        <button onclick="location.reload()" style="padding:15px 50px; background:var(--primary); color:white; border:none; border-radius:50px; cursor:pointer; font-weight:bold; font-size:1.1rem;">RETRY</button>
+    </div>
+</div>
+
+<script>
+const quizData = [
+  { q: "ソレノイドは、どのような力を利用して動作しますか？", a: "電磁石の吸引力",
+    o: ["静電気の力", "永久磁石の反発力", "重力"] },
+
+  { q: "ソレノイドのプル形とは、どのような力を利用するものですか？", a: "引く力",
+    o: ["押す力", "回転する力", "ねじる力"] },
+
+  { q: "ソレノイドの可動鉄心が移動できる距離を何といいますか？", a: "ストローク",
+    o: ["ピッチ", "ギャップ", "スパン"] },
+
+  { q: "直流モータで、回転中もトルクが一定方向に生じるよう、導体に流れる電流の向きを切り換える部品は何ですか？", a: "整流子",
+    o: ["ブラシ", "電機子", "界磁"] },
+
+  { q: "直流モータの原理で、磁界中の導体が受ける力の向きを決定する法則は何ですか？", a: "フレミングの左手の法則",
+    o: ["フレミングの右手の法則", "レンツの法則", "アンペアの右ねじの法則"] },
+
+  { q: "直流モータで、磁界をつくるために固定されている部分を何といいますか？", a: "固定子（界磁）",
+    o: ["電機子", "整流子", "回転子"] },
+
+  { q: "直流モータで、回転して電流が流れる中心部分を何といいますか？", a: "電機子",
+    o: ["固定子", "界磁", "ヨーク"] },
+
+  { q: "直流モータの整流子に接触し、外部回路と電流をやり取りする部品は何ですか？", a: "ブラシ",
+    o: ["ベアリング", "シャフト", "コア"] },
+
+  { q: "アラゴの円板の実験で、磁石を動かすとアルミニウム円板が回転する主な理由は何ですか？", a: "渦電流と磁束の相互作用",
+    o: ["静電気の発生", "摩擦力", "重力"] },
+
+  { q: "単相交流モータで、回転磁界を発生させるために用いられる部品は何ですか？", a: "コンデンサ",
+    o: ["ダイオード", "トランジスタ", "抵抗器"] },
+
+  { q: "コンデンサモータで、始動コイルの電流は主コイルの電流より約何度位相が進みますか？", a: "90度",
+    o: ["60度", "120度", "180度"] },
+
+  { q: "三相交流で回転磁界を作る場合、各相のコイルは何度ずつずらして配置されますか？", a: "120度",
+    o: ["60度", "90度", "180度"] },
+
+  { q: "交流モータにおいて、回転磁界が回転する速度を何といいますか？", a: "同期速度",
+    o: ["定格速度", "実回転速度", "角速度"] },
+
+  { q: "三相誘導モータの回転子で、アルミニウム導体をかご状に配置したものを何といいますか？", a: "かご形回転子",
+    o: ["巻線形回転子", "永久磁石回転子", "直巻回転子"] },
+
+  { q: "直流モータで、界磁巻線と電機子巻線を並列に接続した方式を何といいますか？", a: "分巻モータ",
+    o: ["直巻モータ", "複巻モータ", "永久磁石モータ"] },
+
+  { q: "負荷が変化しても、回転速度がほぼ一定に保たれる直流モータはどれですか？", a: "分巻モータ",
+    o: ["直巻モータ", "複巻モータ", "誘導モータ"] },
+
+  { q: "電車やクレーンなどで使用され、大きな始動トルクが必要な場合に適した直流モータはどれですか？", a: "直巻モータ",
+    o: ["分巻モータ", "同期モータ", "誘導モータ"] },
+
+  { q: "抵抗が一定であるとき、ソレノイドの吸引力は加える電圧の何に比例しますか？", a: "2乗",
+    o: ["1乗", "3乗", "平方根"] },
+
+  { q: "直流モータの回転方向を逆にする方法として正しいものはどれですか？", a: "電機子に流す電流の向きを逆にする",
+    o: ["電圧を上げる", "回転数を上げる", "界磁を強くする"] },
+
+  { q: "交流モータで、同期速度と実際の回転速度との差の割合を何といいますか？", a: "滑り",
+    o: ["誤差", "回転差", "位相差"] },
+
+  { q: "三相同期モータは、回転磁界とどのような速度関係で回転しますか？", a: "同じ速度（同期速度）",
+    o: ["回転磁界より速い", "回転磁界より遅い", "負荷により変化する"] },
+
+  { q: "直流電源を用いて交流を発生させる装置を何といいますか？", a: "インバータ",
+    o: ["コンバータ", "レギュレータ", "トランス"] },
+
+  { q: "ブラシレスモータの主な利点として正しいものはどれですか？", a: "ブラシの摩耗や火花発生の心配がない",
+    o: ["始動トルクが非常に大きい", "構造が単純で安価", "制御が不要"] },
+
+  { q: "ソレノイドにおいて、動作開始時の電流は保持状態の電流のおよそ何倍になりますか？", a: "8倍",
+    o: ["2倍", "4倍", "16倍"] },
+
+  { q: "アンペアの右ねじの法則は、主に何の向きを決定するために使われますか？", a: "磁界の向き",
+    o: ["電流の向き", "力の向き", "電圧の向き"] },
+
+  { q: "直流モータが回転すると発生する誘導起電力のはたらきとして正しいものはどれですか？", a: "流れる電流を小さくする向きにはたらく",
+    o: ["電流を大きくする向きにはたらく", "回転を速くする向きにはたらく", "電圧を一定に保つ"] },
+
+  { q: "単相交流モータで回転方向を変える方法として正しいものはどれですか？", a: "主コイルと始動コイルの接続を入れ替える",
+    o: ["電圧を上げる", "周波数を変える", "コンデンサを大きくする"] },
+
+  { q: "三相誘導モータで、1極対の基本構造の場合、磁極数はいくつですか？", a: "2",
+    o: ["3", "4", "6"] },
+
+  { q: "VVVF制御とは、主に何を変化させてモータの回転を制御する方式ですか？", a: "電圧と周波数",
+    o: ["電流と電圧", "周波数と位相", "回転数とトルク"] },
+
+  { q: "誘導モータが無負荷で運転されているとき、滑りは何％に近いですか？", a: "0％",
+    o: ["10％", "50％", "100％"] }
+];
+
+let currentIdx = 0, score = 0, combo = 0, maxCombo = 0, timeLeft = 900;
+let shuffledData = [];
+
+function initQuiz() {
+    shuffledData = quizData.map(item => {
+        const choices = [item.a, ...item.o].sort(() => Math.random() - 0.5);
+        return { ...item, choices, correctIdx: choices.indexOf(item.a) };
+    });
+    startTimer();
+    renderQuestion();
+}
+
+function startTimer() {
+    setInterval(() => {
+        if (timeLeft <= 0) return;
+        timeLeft--;
+        const min = Math.floor(timeLeft / 60), sec = timeLeft % 60;
+        document.getElementById('timer').innerText = `${min}:${sec < 10 ? '0'+sec : sec}`;
+    }, 1000);
+}
+
+function renderQuestion() {
+    const data = shuffledData[currentIdx];
+    document.getElementById('q-count').innerText = `${(currentIdx + 1).toString().padStart(2, '0')} / 30`;
+    document.getElementById('progress-fill').style.width = `${(currentIdx / 30) * 100}%`;
+    document.getElementById('question-text').innerText = data.q;
+    
+    const choicesContainer = document.getElementById('choices');
+    choicesContainer.innerHTML = '';
+    data.choices.forEach((choice, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'choice';
+        btn.innerText = choice;
+        btn.onclick = () => checkAnswer(i);
+        choicesContainer.appendChild(btn);
+    });
+
+    document.getElementById('feedback').style.display = 'none';
+    document.getElementById('next-btn').style.display = 'none';
+}
+
+function checkAnswer(idx) {
+    const data = shuffledData[currentIdx];
+    const feedback = document.getElementById('feedback');
+    const comboDisplay = document.getElementById('combo-display');
+    const buttons = document.querySelectorAll('.choice');
+    
+    buttons.forEach(btn => btn.disabled = true);
+    feedback.style.display = 'block';
+
+    if (idx === data.correctIdx) {
+        score++; combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        feedback.className = 'correct-ui';
+        feedback.innerHTML = `<strong>正解！</strong> 正解は「${data.a}」です。`;
+        comboDisplay.innerText = `${combo} COMBO`;
+        comboDisplay.style.transform = "scale(1.3)";
+        setTimeout(() => comboDisplay.style.transform = "scale(1)", 200);
+    } else {
+        combo = 0;
+        feedback.className = 'incorrect-ui';
+        feedback.innerHTML = `<strong>不正解...</strong> 正解は「${data.a}」でした。`;
+        comboDisplay.innerText = '';
+    }
+    document.getElementById('next-btn').style.display = 'block';
+}
+
+function handleNext() {
+    currentIdx++;
+    if (currentIdx < shuffledData.length) renderQuestion();
+    else showResult();
+}
+
+function showResult() {
+    document.getElementById('quiz-screen').style.display = 'none';
+    document.getElementById('result-screen').style.display = 'block';
+    document.getElementById('score-display').innerText = `${score} / 30`;
+    
+    let rank = "", medal = "", comment = "";
+    const rate = score / 30;
+
+    if (rate >= 0.9) { rank = "ACTUATOR MASTER"; medal = "👑"; comment = "完璧です！モータの構造から制御まで完全に掌握しました。"; }
+    else if (rate >= 0.7) { rank = "SENIOR ENGINEER"; medal = "🥇"; comment = "素晴らしい成績です。実習でも自信を持って取り組めます。"; }
+    else if (rate >= 0.4) { rank = "OPERATOR"; medal = "🥈"; comment = "基本は押さえています。間違えた用語をもう一度見直しましょう。"; }
+    else { rank = "TRAINEE"; medal = "🥉"; comment = "基礎からもう一度復習が必要です。特に直流と交流の違いを確認しましょう。"; }
+
+    document.getElementById('rank-name').innerText = rank;
+    document.getElementById('medal').innerText = medal;
+    document.getElementById('rank-comment').innerText = `${comment}\n(最大コンボ: ${maxCombo})`;
+}
+
+initQuiz();
+</script>
+
+</body>
+</html>
